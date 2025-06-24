@@ -1,136 +1,89 @@
-#!/usr/bin/env python
-# coding: utf-8
+#!/usr/bin/env python3
+"""
+HTML Regex Extractor Script
 
-from __future__ import unicode_literals
+This script reads an HTML file and searches for a specific regex pattern,
+extracting capture groups and writing them to a TSV file with tab separators.
+"""
 
+import re
+import csv
 import argparse
-import datetime
-
-from collections import OrderedDict
-from decimal import Decimal
-from re import compile as regexp_compile
-
-import rows
-
-from lxml.etree import HTML
+import sys
+from pathlib import Path
 
 
-REGEXP_PAGE = regexp_compile(r'^[0-9]+ de [0-9]+$')
-MONTHS = 'JAN FEV MAR ABR MAI JUN JUL AGO SET OUT NOV DEZ'
-FIELDS = OrderedDict([('category', rows.fields.TextField),
-                      ('description', rows.fields.TextField),
-                      ('value', rows.fields.DecimalField),
-                      ('date', rows.fields.DateField)])
-
-
-def partition(data, number):
-    for index in range(0, len(data), number):
-        yield data[index:index + number]
-
-
-def convert_text(text):
-    return text.replace('\xa0', ' ')
-
-
-def convert_value(value):
-    return Decimal(convert_text(value).replace('.', '').replace(',', '.')
-                                      .strip().replace(' ', ''))
-
-def convert_date(value, year):
-    day, month = convert_text(value).split()
-    day = int(day)
-    month = MONTHS.split().index(month) + 1
-    return datetime.date(year, month, day)
-
-
-def extract_month(entry):
-    return convert_text(entry[3]).split()[1]
-
-
-def html_to_table(input_filename, encoding='utf-8'):
-    with open(input_filename) as fobj:
-        html = fobj.read().decode(encoding).replace('\xa0', ' ')
-    tree = HTML(html)
-
-    data = tree.xpath('//body/b')
-    for index, element in enumerate(data):
-        text = element.text
-        if text.startswith('Valores') and text.endswith('R$'):
-            break
-    new = []
-    for element in data[index + 1:]:
-        text = element.text
-        if text.startswith('FATURA DE '):
-            continue
-        elif REGEXP_PAGE.findall(text):
-            continue
-        else:
-            new.append(element.text)
-    data = new
-
-    chunks = [[value.strip() for value in row]
-              for row in partition(data, 4) if len(row) == 4]
-    table = rows.Table(fields=FIELDS)
-    current_year = datetime.datetime.now().year
-    months = set(extract_month(row) for row in chunks)
-    subtract_year = 'DEZ' in months and 'JAN' in months
-    for row in chunks:
-        try:
-            category = convert_text(row[0])
-            description = convert_text(row[1])
-            value = convert_value(row[2])
-        except:
-            print('WARNING: Ignoring row: {}'.format(row))
-            continue
-        year = current_year
-        month = extract_month(row)
-        if subtract_year and month in ('NOV', 'DEZ'):
-            year = current_year - 1
-        date = convert_date(row[3], year)
-        table.append({'category': category,
-                      'description': description,
-                      'value': value,
-                      'date': date, })
-
-    return table
-
-
-def sum_iof_into_entries(table):
-    entries, iofs = [], {}
-    for row in table:
-        description = row.description.lower()
-        if description.startswith('iof de "'):
-            entry_description = description.split('"')[1].strip()
-            iofs[entry_description] = row
-        else:
-            entries.append(row)
-
-    table = rows.Table(fields=FIELDS)
-    for entry in entries:
-        description = entry.description.lower().strip()
-        entry = {'description': entry.description.strip(),
-                 'value': entry.value,
-                 'category': entry.category,
-                 'date': entry.date, }
-        if description in iofs:
-            iof = iofs[description]
-            entry['description'] += ' (+ IOF)'
-            entry['value'] += iof.value
-        table.append(entry)
-
-    table.order_by('date')
-    return table
+def extract_data_from_html(html_file_path, output_csv_path):
+    """
+    Extract data from HTML file using regex and write to TSV.
+    
+    Args:
+        html_file_path (str): Path to the input HTML file
+        output_csv_path (str): Path to the output TSV file
+    """
+    # The regex pattern with 4 capture groups
+    # Updated to handle space after R$ (Brazilian currency format)
+    pattern = r"^(.*)<br\/>\n•••• (\d{4})<br\/>\n(.*)<br\/>\nR\$ (.*)<br\/>"
+    
+    try:
+        # Read the HTML file
+        with open(html_file_path, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+        
+        # Find all matches (using MULTILINE flag for ^ anchor)
+        matches = re.findall(pattern, html_content, re.MULTILINE)
+        
+        if not matches:
+            print(f"No matches found in {html_file_path}")
+            return
+        
+        # Write to TSV file (tab-separated values)
+        with open(output_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile, delimiter='\t')
+            
+            # Write header (optional - you can remove this if not needed)
+            writer.writerow(['Date', 'CardNumber', 'Description', 'Amount'])
+            
+            # Write each match as a row (keeping original comma format in amounts)
+            for match in matches:
+                writer.writerow(match)
+        
+        print(f"Successfully extracted {len(matches)} matches from {html_file_path}")
+        print(f"Results written to {output_csv_path}")
+        
+    except FileNotFoundError:
+        print(f"Error: File {html_file_path} not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        sys.exit(1)
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('html_entrada')
-    parser.add_argument('csv_saida')
+    """Main function to handle command line arguments and execute the extraction."""
+    parser = argparse.ArgumentParser(
+        description="Extract data from HTML file using regex and save to TSV"
+    )
+    parser.add_argument(
+        'html_file', 
+        help='Path to the input HTML file'
+    )
+    parser.add_argument(
+        '-o', '--output', 
+        default='output.csv',
+        help='Path to the output TSV file (default: output.csv)'
+    )
+    
     args = parser.parse_args()
+    
+    # Validate input file exists
+    if not Path(args.html_file).exists():
+        print(f"Error: Input file {args.html_file} does not exist.")
+        sys.exit(1)
+    
+    # Extract data
+    extract_data_from_html(args.html_file, args.output)
 
-    table = sum_iof_into_entries(html_to_table(args.html_entrada))
-    rows.export_to_csv(table, args.csv_saida)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

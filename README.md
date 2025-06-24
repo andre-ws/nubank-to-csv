@@ -1,15 +1,10 @@
 # `nubank-to-csv`
 
-Script que converte o PDF da fatura do NuBank para CSV, já somando o IOF de
-cada item (na fatura o IOF vem em itens separados).
+Script que converte o PDF da fatura do NuBank para CSV, incluindo o número do cartão onde foi feita cada compra (informação que falta no CSV oficial).
 
-O script converte o PDF para HTML (através do softwar e `pdftohtml`, contido no
+Primeiro o PDF precisa ser convertido para HTML (através do softwar e `pdftohtml`, contido no
 pacote `poppler-utils`) e depois faz *parsing* do HTML, pegando somente os
-dados desejados, e depois junta os itens de IOF com o item principal.
-
-> Nota: como no PDF não existe a informação do ano, o script entende que o ano
-> da fatura é o ano corrente.
-
+dados desejados.
 
 ## Instalação
 
@@ -18,21 +13,6 @@ dados desejados, e depois junta os itens de IOF com o item principal.
 Dependências do sistema:
 
     apt-get install poppler-utils
-
-Dependências Python:
-
-    pip install lxml rows
-
-Caso prefira instalar tudo pelo sistema:
-
-    apt-get install poppler-utils python-lxml python-rows
-
-
-### Script
-
-Baixe o arquivo `nubank.py` contido [nesse
-repositório](https://github.com/turicas/nubank-to-csv).
-
 
 ## Uso
 
@@ -47,7 +27,7 @@ arquivo `XXXs.html` (dentre outros) no mesmo diretório.
 
 Converter de HTML para CSV:
 
-    python nubank.py XXXs.html minha-linda-fatura.csv
+    python3 nubank.py XXXs.html -o minha-linda-fatura.csv
 
 Agora é só brincar com o arquivo `minha-linda-fatura.csv`! ;-)
 
@@ -58,6 +38,5 @@ O software é livre e você pode contribuir. :) Sugestões de contribuição:
 
 - Criar função para já rodar o `pdftohtml` automaticamente, de forma que
   precisemos rodar apenas um comando (o próprio `nubank-to-csv`).
-- Criar um aplicativo Web simples em que seja possível fazer o upload do PDF e
-  o download do CSV convertido.
+- Transformar a data que está como "01 JAN" pra um formato numérico melhor
 
