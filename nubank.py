@@ -98,7 +98,7 @@ def extract_data_from_html(html_file_path, output_csv_path):
             
             # Parse and convert the date
             iso_date = parse_portuguese_date(date_str, current_year, is_december_first_row)
-            processed_matches.append([iso_date, card_number, description, amount])
+            processed_matches.append([iso_date, card_number, description, -amount])
         
         # Write to TSV file (tab-separated values)
         with open(output_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
