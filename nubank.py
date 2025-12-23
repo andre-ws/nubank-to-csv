@@ -94,7 +94,8 @@ def extract_data_from_html(html_file_path, output_csv_path):
         # Process matches and convert dates
         processed_matches = []
         for match in matches:
-            date_str, card_number, description, amount = match
+            date_str, card_number, description, amount_text = match
+            amount = -float(amount_text.replace('.', '').replace(',', '.'))
             
             # Parse and convert the date
             iso_date = parse_portuguese_date(date_str, current_year, is_december_first_row)
